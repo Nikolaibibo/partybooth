@@ -25,7 +25,7 @@ const STYLES = [
   // === PROVEN (work well) ===
   {
     id: 'comic',
-    prompt: 'Transform into a classic superhero comic book illustration: bold black ink outlines defining all features, cel-shaded flat colors with no gradients, dramatic shadows in solid black. Style like a Marvel or DC comic panel. Keep the exact face.',
+    prompt: 'Add comic book ink outline effect: bold black ink lines along facial features, hair edges, and contours. Boost color saturation slightly. Keep the original photo visible with ink lines overlaid. Do NOT change the face.',
   },
   {
     id: 'pop-art',

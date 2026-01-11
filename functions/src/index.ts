@@ -22,7 +22,7 @@ const STYLE_PROMPTS: Record<string, string> = {
   vintage:
     "Apply vintage 1970s film photograph style to this portrait: warm amber color tones, natural film grain texture, slightly faded highlights, and soft vignette edges. Maintain the person's exact facial features, expression, hairstyle, and pose while applying the vintage color treatment.",
   comic:
-    "Transform this portrait into a classic superhero comic book illustration: bold black ink outlines defining all features and contours, cel-shaded flat color areas with no gradients, dramatic shadows in solid black. Style like a Marvel or DC comic panel. Maintain the person's exact facial features, expression, and pose.",
+    "Add comic book ink outline effect to this portrait: add bold black ink lines along facial features, hair edges, and clothing contours. Slightly boost color saturation. Keep the original photo visible with the ink lines overlaid. Do NOT change the person's face - only add the outline effect.",
   renaissance:
     "Add dramatic Renaissance-style chiaroscuro lighting to this portrait: warm golden light from one side casting soft shadows across the face, rich deep shadows on the opposite side. Add a dark, painterly background with subtle texture. Maintain the person's exact facial features, expression, and likeness - apply only lighting and background changes.",
   cyberpunk:
