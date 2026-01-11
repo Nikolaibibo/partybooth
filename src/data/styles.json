@@ -62,6 +62,41 @@
       "thumbnail": "/thumbnails/pixel.jpg",
       "color": "#22c55e",
       "gradient": "from-green-500 to-emerald-400"
+    },
+    {
+      "id": "cartoon",
+      "name": "Cartoon",
+      "thumbnail": "/thumbnails/cartoon.jpg",
+      "color": "#f472b6",
+      "gradient": "from-pink-400 to-purple-400"
+    },
+    {
+      "id": "champagne",
+      "name": "Champagne",
+      "thumbnail": "/thumbnails/champagne.jpg",
+      "color": "#fbbf24",
+      "gradient": "from-yellow-400 to-amber-300"
+    },
+    {
+      "id": "floral-frame",
+      "name": "Floral Frame",
+      "thumbnail": "/thumbnails/floral-frame.jpg",
+      "color": "#fb7185",
+      "gradient": "from-rose-400 to-pink-300"
+    },
+    {
+      "id": "golden-hour",
+      "name": "Golden Hour",
+      "thumbnail": "/thumbnails/golden-hour.jpg",
+      "color": "#f59e0b",
+      "gradient": "from-amber-400 to-orange-400"
+    },
+    {
+      "id": "magazine",
+      "name": "Magazine",
+      "thumbnail": "/thumbnails/magazine.jpg",
+      "color": "#8b5cf6",
+      "gradient": "from-violet-500 to-purple-500"
     }
   ]
 }

@@ -15,4 +15,9 @@ export const styleNameKeys: Record<string, TranslationKey> = {
   disco: 'styleDisco',
   polaroid: 'stylePolaroid',
   pixel: 'stylePixel',
+  cartoon: 'styleCartoon',
+  champagne: 'styleChampagne',
+  'floral-frame': 'styleFloralFrame',
+  'golden-hour': 'styleGoldenHour',
+  magazine: 'styleMagazine',
 };

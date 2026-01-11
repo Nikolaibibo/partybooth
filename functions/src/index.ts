@@ -41,6 +41,16 @@ const STYLE_PROMPTS: Record<string, string> = {
     "Apply authentic Polaroid instant film style to this portrait: slightly faded colors with warm yellowish tint, soft vignette corners, subtle light leak effects, characteristic Polaroid color rendering with boosted warm tones. Maintain the person's exact facial features and expression while applying the vintage instant film aesthetic.",
   pixel:
     "Transform this portrait into pixel art style: reduce to chunky visible pixels like 8-bit retro video game graphics, limited color palette, blocky pixelated features while maintaining recognizable likeness. Apply retro gaming aesthetic with clean pixel edges.",
+  cartoon:
+    "Apply soft cartoon illustration style to this portrait. Smooth skin, slightly stylized features like Disney/Pixar animation, bright colors, clean lines. Keep the likeness recognizable while adding gentle cartoon aesthetic.",
+  champagne:
+    "Add golden champagne bubbles floating effect around the subject. Sparkling gold bubbles and fizz particles throughout the frame, celebration atmosphere with warm golden glow. Do NOT change the person - only add bubble overlay effect.",
+  'floral-frame':
+    "Add delicate floral frame around the edges of this portrait. Soft flowers and botanical elements as border overlay, elegant wedding bouquet style with roses and greenery. Do NOT change the person - only add floral border decoration.",
+  'golden-hour':
+    "Apply warm golden hour sunset lighting to this portrait. Soft warm orange glow, gentle lens flare, golden sunlight atmosphere with warm color grading. Do NOT change the person - only adjust lighting warmth and add golden tones.",
+  magazine:
+    "Transform into a glossy magazine cover layout. Add bold headline text at top, subheadlines, barcode in corner, magazine title logo. High fashion editorial lighting with slight skin smoothing. Professional magazine cover composition with text overlays.",
 };
 
 interface FluxSubmitResponse {

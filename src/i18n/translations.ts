@@ -18,6 +18,11 @@ export const translations = {
     styleDisco: 'Disco',
     stylePolaroid: 'Polaroid',
     stylePixel: 'Pixel Art',
+    styleCartoon: 'Cartoon',
+    styleChampagne: 'Champagne',
+    styleFloralFrame: 'Floral Frame',
+    styleGoldenHour: 'Golden Hour',
+    styleMagazine: 'Magazine',
 
     // Camera
     getReady: 'Get ready!',
@@ -83,6 +88,11 @@ export const translations = {
     styleDisco: 'Disco',
     stylePolaroid: 'Polaroid',
     stylePixel: 'Pixel Art',
+    styleCartoon: 'Cartoon',
+    styleChampagne: 'Champagner',
+    styleFloralFrame: 'Blumenrahmen',
+    styleGoldenHour: 'Goldene Stunde',
+    styleMagazine: 'Magazin',
 
     // Camera
     getReady: 'Mach dich bereit!',
