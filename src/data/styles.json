@@ -50,13 +50,6 @@
       "gradient": "from-fuchsia-500 to-cyan-400"
     },
     {
-      "id": "neon",
-      "name": "Neon Glow",
-      "thumbnail": "/thumbnails/neon.jpg",
-      "color": "#22d3ee",
-      "gradient": "from-cyan-400 to-blue-500"
-    },
-    {
       "id": "polaroid",
       "name": "Polaroid",
       "thumbnail": "/thumbnails/polaroid.jpg",

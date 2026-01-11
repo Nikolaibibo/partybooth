@@ -25,11 +25,11 @@ const STYLES = [
   // === PROVEN (work well) ===
   {
     id: 'comic',
-    prompt: 'Apply bold comic book illustration style: thick black ink outlines around features, cel-shaded flat coloring, halftone dot patterns. Keep the exact face and pose.',
+    prompt: 'Transform into a classic superhero comic book illustration: bold black ink outlines defining all features, cel-shaded flat colors with no gradients, dramatic shadows in solid black. Style like a Marvel or DC comic panel. Keep the exact face.',
   },
   {
     id: 'pop-art',
-    prompt: 'Apply Andy Warhol pop art style: flatten into bright color blocks, high contrast, halftone dots, vibrant saturated colors. Keep the exact face.',
+    prompt: 'Apply Andy Warhol silk-screen pop art style: bold flat color blocks in neon pink, electric blue, bright yellow, high contrast with minimal shading, screen-print aesthetic. Poster-like graphic quality. Keep the exact face.',
   },
   // === ADJUSTED (lighter touch) ===
   {
@@ -52,10 +52,6 @@ const STYLES = [
   {
     id: 'disco',
     prompt: 'Add disco party lighting: colorful light spots, rainbow bokeh effects in background, warm party atmosphere glow. Keep the person exactly the same.',
-  },
-  {
-    id: 'neon',
-    prompt: 'Add neon outline effect: bright glowing neon lines tracing around the face and body contours, electric blue and pink glow. Keep the original photo visible.',
   },
   {
     id: 'polaroid',

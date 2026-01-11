@@ -13,7 +13,6 @@ export const styleNameKeys: Record<string, TranslationKey> = {
   sketch: 'styleSketch',
   sparkle: 'styleSparkle',
   disco: 'styleDisco',
-  neon: 'styleNeon',
   polaroid: 'stylePolaroid',
   pixel: 'stylePixel',
 };

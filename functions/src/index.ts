@@ -22,7 +22,7 @@ const STYLE_PROMPTS: Record<string, string> = {
   vintage:
     "Apply vintage 1970s film photograph style to this portrait: warm amber color tones, natural film grain texture, slightly faded highlights, and soft vignette edges. Maintain the person's exact facial features, expression, hairstyle, and pose while applying the vintage color treatment.",
   comic:
-    "Apply bold comic book illustration style to this portrait: thick black ink outlines around features, cel-shaded flat coloring, halftone dot patterns in shadow areas, high dynamic contrast. Maintain the person's exact facial features, expression, and pose while adding the comic art rendering style.",
+    "Transform this portrait into a classic superhero comic book illustration: bold black ink outlines defining all features and contours, cel-shaded flat color areas with no gradients, dramatic shadows in solid black. Style like a Marvel or DC comic panel. Maintain the person's exact facial features, expression, and pose.",
   renaissance:
     "Add dramatic Renaissance-style chiaroscuro lighting to this portrait: warm golden light from one side casting soft shadows across the face, rich deep shadows on the opposite side. Add a dark, painterly background with subtle texture. Maintain the person's exact facial features, expression, and likeness - apply only lighting and background changes.",
   cyberpunk:
@@ -30,15 +30,13 @@ const STYLE_PROMPTS: Record<string, string> = {
   watercolor:
     "Apply delicate watercolor painting style to this portrait: soft flowing colors that blend at edges, visible paper texture throughout, gentle brushstroke effects, slightly muted pastel tones. Maintain the person's exact facial features, expression, and likeness while applying the watercolor artistic rendering.",
   'pop-art':
-    "Apply bold Andy Warhol-style pop art treatment to this portrait: flatten colors into bright graphic blocks, dramatically increase contrast, add halftone dot patterns in midtones and shadows, use vibrant saturated colors. Maintain the person's exact face shape, features, and expression while applying the pop art color style.",
+    "Apply Andy Warhol silk-screen pop art style to this portrait: bold flat color blocks in neon pink, electric blue, bright yellow, high contrast with minimal shading, screen-print aesthetic with slightly offset color registration. Poster-like graphic quality. Maintain the person's exact face shape, features, and expression.",
   sketch:
     "Transform this portrait into a detailed pencil sketch drawing: use graphite pencil shading techniques with crosshatching for shadows, clean defined lines for features, visible paper texture background, high contrast between light and dark areas. Maintain the person's exact facial features, expression, and likeness while applying the hand-drawn pencil sketch artistic style.",
   sparkle:
     "Add magical sparkle overlay effects around this portrait: scattered light particles and star-shaped lens flares floating around the subject, iridescent highlights on hair edges, fairy-dust particle overlay in the air. Do NOT alter the person's face or skin - only add sparkle effects around and near them.",
   disco:
     "Add 1970s disco lighting effects to this portrait: colorful light reflections as if from a disco ball casting pink/purple/blue colored light on the subject, light streaks, retro film grain texture. Add a dark background with scattered disco light spots. Do NOT alter the person's face - only add lighting and color effects.",
-  neon:
-    "Add neon lighting effects to this portrait: vivid cyan and magenta colored light sources casting dramatic colored shadows on the subject, electric blue rim lighting on edges. Add a dark urban background. Do NOT alter the person's face - only change the lighting colors and background.",
   polaroid:
     "Apply authentic Polaroid instant film style to this portrait: slightly faded colors with warm yellowish tint, soft vignette corners, subtle light leak effects, characteristic Polaroid color rendering with boosted warm tones. Maintain the person's exact facial features and expression while applying the vintage instant film aesthetic.",
   pixel:

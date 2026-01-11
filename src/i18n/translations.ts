@@ -16,7 +16,6 @@ export const translations = {
     styleSketch: 'Pencil Sketch',
     styleSparkle: 'Sparkle',
     styleDisco: 'Disco',
-    styleNeon: 'Neon',
     stylePolaroid: 'Polaroid',
     stylePixel: 'Pixel Art',
 
@@ -82,7 +81,6 @@ export const translations = {
     styleSketch: 'Bleistift',
     styleSparkle: 'Glitzer',
     styleDisco: 'Disco',
-    styleNeon: 'Neon',
     stylePolaroid: 'Polaroid',
     stylePixel: 'Pixel Art',
 
