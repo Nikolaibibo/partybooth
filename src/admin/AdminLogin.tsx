@@ -29,7 +29,7 @@ export function AdminLogin() {
       const token = await verifyAdmin(password);
       localStorage.setItem('adminToken', token);
       navigate('/admin/events');
-    } catch (err) {
+    } catch (_err) {
       setError('Invalid password');
     } finally {
       setLoading(false);
