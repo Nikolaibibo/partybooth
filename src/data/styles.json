@@ -1,0 +1,74 @@
+{
+  "styles": [
+    {
+      "id": "comic",
+      "name": "Comic Book",
+      "thumbnail": "/thumbnails/comic.jpg",
+      "color": "#FF6B6B",
+      "gradient": "from-red-500 to-pink-600"
+    },
+    {
+      "id": "pop-art",
+      "name": "Pop Art",
+      "thumbnail": "/thumbnails/pop-art.jpg",
+      "color": "#FFD700",
+      "gradient": "from-pink-500 to-yellow-400"
+    },
+    {
+      "id": "vintage",
+      "name": "Vintage Film",
+      "thumbnail": "/thumbnails/vintage.jpg",
+      "color": "#D4A574",
+      "gradient": "from-amber-400 to-orange-600"
+    },
+    {
+      "id": "cyberpunk",
+      "name": "Cyberpunk",
+      "thumbnail": "/thumbnails/cyberpunk.jpg",
+      "color": "#00FFFF",
+      "gradient": "from-purple-600 to-cyan-500"
+    },
+    {
+      "id": "glamour",
+      "name": "Glamour",
+      "thumbnail": "/thumbnails/glamour.jpg",
+      "color": "#fbbf24",
+      "gradient": "from-amber-400 to-yellow-200"
+    },
+    {
+      "id": "sparkle",
+      "name": "Sparkle",
+      "thumbnail": "/thumbnails/sparkle.jpg",
+      "color": "#c084fc",
+      "gradient": "from-purple-400 to-pink-300"
+    },
+    {
+      "id": "disco",
+      "name": "Disco",
+      "thumbnail": "/thumbnails/disco.jpg",
+      "color": "#d946ef",
+      "gradient": "from-fuchsia-500 to-cyan-400"
+    },
+    {
+      "id": "neon",
+      "name": "Neon Glow",
+      "thumbnail": "/thumbnails/neon.jpg",
+      "color": "#22d3ee",
+      "gradient": "from-cyan-400 to-blue-500"
+    },
+    {
+      "id": "polaroid",
+      "name": "Polaroid",
+      "thumbnail": "/thumbnails/polaroid.jpg",
+      "color": "#fdba74",
+      "gradient": "from-orange-200 to-amber-100"
+    },
+    {
+      "id": "vhs",
+      "name": "VHS Retro",
+      "thumbnail": "/thumbnails/vhs.jpg",
+      "color": "#f87171",
+      "gradient": "from-red-400 to-blue-400"
+    }
+  ]
+}

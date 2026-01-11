@@ -1,0 +1,174 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+PartyBooth is an AI photo booth web app for tablet kiosks at events. Users select a style, take a selfie, and receive an AI-transformed image via QR code. Photos are organized by event with a public gallery for guests.
+
+**Tech Stack:** React + Vite + TypeScript + Tailwind CSS + Firebase (Hosting, Functions, Firestore, Storage) + Black Forest Labs FLUX Kontext Pro API
+
+## Commands
+
+### Frontend Development
+```bash
+npm run dev          # Start Vite dev server (localhost:5173)
+npm run build        # TypeScript check + Vite production build
+npm run preview      # Preview production build locally
+npm run lint         # ESLint
+```
+
+### Cloud Functions (from /functions directory)
+```bash
+npm run build        # Compile TypeScript
+npm run serve        # Build + start Firebase emulator
+npm run deploy       # Deploy functions only
+npm run logs         # View function logs
+```
+
+### Firebase Deployment
+```bash
+firebase deploy                    # Deploy everything
+firebase deploy --only hosting     # Frontend only
+firebase deploy --only functions   # Functions only
+firebase deploy --only firestore   # Rules + indexes
+```
+
+### Emulator Usage
+```bash
+firebase emulators:start           # Start all emulators
+```
+Set `VITE_USE_EMULATOR=true` in `.env.local` to connect frontend to local emulators.
+
+## Routes
+
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | EventSelector | Landing page - select event for kiosk |
+| `/booth?event={id}` | BoothPage | Photo booth experience |
+| `/gallery/:eventSlug` | GalleryPage | Public photo gallery |
+| `/admin` | AdminLogin | Admin login (password auth) |
+| `/admin/events` | EventList | Manage events |
+| `/admin/events/new` | EventForm | Create new event |
+| `/admin/events/:id` | EventDetail | Event details + photos |
+
+## Architecture
+
+### Booth Flow (State Machine)
+The booth uses a reducer-based state machine in `src/pages/BoothPage.tsx`:
+```
+style-selection → countdown → capturing → processing → result → (reset)
+```
+
+### Key Data Flow
+1. **EventSelector** or direct URL - Selects event, redirects to `/booth?event={id}`
+2. **StyleGallery** - User selects style from `src/data/styles.json`
+3. **CameraCapture** - Countdown → capture via `useCamera` hook → base64 image
+4. **ProcessingView** - Shows while waiting for API
+5. **transformImage Cloud Function**:
+   - Validates event exists and is active
+   - Submits to FLUX Kontext Pro API with style prompt
+   - Polls the returned `polling_url` until ready
+   - Generates thumbnail (400x400) using Sharp
+   - Stores both in Cloud Storage under `photos/{eventId}/`
+   - Creates photo document in Firestore
+6. **ResultView** - Displays image + QR code, auto-resets after 15 seconds
+
+### Firestore Collections
+
+**events**
+```typescript
+{
+  id: string;
+  name: string;           // "Wedding 2025"
+  slug: string;           // URL-friendly: "wedding-2025"
+  date: Timestamp;
+  createdAt: Timestamp;
+  isActive: boolean;
+}
+```
+
+**photos**
+```typescript
+{
+  id: string;
+  eventId: string;
+  styleId: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  createdAt: Timestamp;
+  storagePath: string;
+}
+```
+
+### Cloud Functions
+
+| Function | Purpose |
+|----------|---------|
+| `transformImage` | Process photo with FLUX API, store with thumbnail |
+| `verifyAdmin` | Validate admin password, return session token |
+| `createEvent` | Create new event (requires admin token) |
+| `updateEvent` | Update event properties (requires admin token) |
+| `deleteEvent` | Delete event (requires admin token) |
+
+### Storage Structure
+```
+photos/{eventId}/{timestamp}_{uuid}.jpg           # Full-size image
+photos/{eventId}/thumbs/{timestamp}_{uuid}_thumb.jpg  # 400x400 thumbnail
+```
+
+### i18n
+Language is determined by URL parameter (`?lang=de` or `?lang=en`, defaults to English).
+- Translations: `src/i18n/translations.ts`
+- Hook: `src/hooks/useTranslation.ts`
+- No UI language switcher - URL-driven only
+
+## Firebase Configuration
+
+- **Project:** partybooth-f8991547
+- **Region:** europe-west1 (functions)
+- **Firestore:** Events and photo metadata
+- **Storage:** Public read, functions-only write
+
+### Secrets
+```bash
+firebase functions:secrets:set BFL_API_KEY        # FLUX API key
+firebase functions:secrets:set ADMIN_PASSWORD     # Admin login password
+```
+
+### Environment Variables (.env.local)
+```
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_APP_ID=
+VITE_USE_EMULATOR=true  # Optional: connect to local emulators
+```
+
+## Key Files
+
+| Path | Purpose |
+|------|---------|
+| `src/components/Router.tsx` | App routing configuration |
+| `src/pages/BoothPage.tsx` | Main photo booth logic |
+| `src/gallery/GalleryPage.tsx` | Public gallery view |
+| `src/admin/*.tsx` | Admin interface components |
+| `src/services/events.ts` | Event Firestore queries |
+| `src/services/gallery.ts` | Photo Firestore queries |
+| `src/services/admin.ts` | Admin API calls |
+| `functions/src/index.ts` | All cloud functions |
+| `firestore.rules` | Firestore security rules |
+| `firestore.indexes.json` | Composite indexes |
+
+## Style Definitions
+
+Styles are defined in two places (keep in sync):
+- `src/data/styles.json` - Client-side metadata (id, gradient, color)
+- `functions/src/index.ts` - Server-side prompts (security: not exposed to client)
+
+Adding a new style requires:
+1. Add entry to `styles.json`
+2. Add prompt to `STYLE_PROMPTS` in cloud function
+3. Add translation keys to `src/i18n/translations.ts` (both `en` and `de`)
+4. Update `styleNameKeys` mapping in `StyleGallery.tsx` and `ProcessingView.tsx`

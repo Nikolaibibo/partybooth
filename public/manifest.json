@@ -1,0 +1,19 @@
+{
+  "name": "PartyBooth",
+  "short_name": "PartyBooth",
+  "description": "AI Photo Booth for Events",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f23",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["photo", "entertainment"]
+}

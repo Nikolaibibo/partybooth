@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Events: read-only for all, write via admin functions only
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if false;  // Only via Cloud Functions
+    }
+
+    // Photos: read-only for all, write via Cloud Functions only
+    match /photos/{photoId} {
+      allow read: if true;
+      allow write: if false;  // Only via Cloud Functions
+    }
+  }
+}

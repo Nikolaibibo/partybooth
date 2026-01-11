@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Photos organized by event
+    match /photos/{eventId}/{fileName} {
+      allow read: if true;
+      allow write: if false;  // Only via Cloud Functions
+    }
+
+    // Thumbnails
+    match /photos/{eventId}/thumbs/{fileName} {
+      allow read: if true;
+      allow write: if false;  // Only via Cloud Functions
+    }
+
+    // Legacy path for backward compatibility
+    match /photos/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
