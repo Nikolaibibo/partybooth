@@ -110,7 +110,7 @@ export function BoothPage() {
           return;
         }
         setEvent(eventData);
-      } catch (error) {
+      } catch (_error) {
         showError('Failed to load event');
         navigate('/');
       } finally {

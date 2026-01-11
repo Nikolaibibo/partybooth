@@ -1,13 +1,15 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
-import { randomUUID } from 'crypto';
+import { randomUUID, timingSafeEqual } from 'crypto';
 import sharp from 'sharp';
+import jwt from 'jsonwebtoken';
 
 admin.initializeApp();
 
 const bflApiKey = defineSecret('BFL_API_KEY');
 const adminPassword = defineSecret('ADMIN_PASSWORD');
+const jwtSecret = defineSecret('JWT_SECRET');
 
 const db = admin.firestore();
 
@@ -272,19 +274,20 @@ export const transformImage = onCall(
 // Admin Functions
 // ============================================================
 
-function generateToken(eventId: string): string {
-  const payload = {
-    admin: true,
-    exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
-    id: eventId,
-  };
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
+const TOKEN_EXPIRY = '24h';
+
+function generateToken(secret: string): string {
+  return jwt.sign(
+    { admin: true, jti: randomUUID() },
+    secret,
+    { expiresIn: TOKEN_EXPIRY }
+  );
 }
 
-function verifyToken(token: string): boolean {
+function verifyToken(token: string, secret: string): boolean {
   try {
-    const payload = JSON.parse(Buffer.from(token, 'base64').toString());
-    return payload.admin === true && payload.exp > Date.now();
+    const payload = jwt.verify(token, secret) as jwt.JwtPayload;
+    return payload.admin === true;
   } catch {
     return false;
   }
@@ -293,7 +296,7 @@ function verifyToken(token: string): boolean {
 export const verifyAdmin = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [adminPassword, jwtSecret],
   },
   async (request): Promise<{ token: string }> => {
     const { password } = request.data as { password: string };
@@ -302,14 +305,18 @@ export const verifyAdmin = onCall(
       throw new HttpsError('invalid-argument', 'Password is required');
     }
 
-    // Compare with stored password (simple comparison for MVP)
+    // Compare with stored password using timing-safe comparison
     const storedPassword = adminPassword.value();
-    if (password !== storedPassword) {
+    const inputBuffer = Buffer.from(password);
+    const storedBuffer = Buffer.from(storedPassword);
+
+    if (inputBuffer.length !== storedBuffer.length ||
+        !timingSafeEqual(inputBuffer, storedBuffer)) {
       throw new HttpsError('permission-denied', 'Invalid password');
     }
 
-    // Generate a simple token
-    const token = generateToken(randomUUID());
+    // Generate signed JWT token
+    const token = generateToken(jwtSecret.value());
     return { token };
   }
 );
@@ -326,13 +333,13 @@ interface CreateEventInput {
 export const createEvent = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [jwtSecret],
   },
   async (request): Promise<{ eventId: string }> => {
     const { name, slug, date, isActive, theme, token } = request.data as CreateEventInput;
 
     // Verify admin token
-    if (!verifyToken(token)) {
+    if (!verifyToken(token, jwtSecret.value())) {
       throw new HttpsError('permission-denied', 'Invalid or expired token');
     }
 
@@ -379,12 +386,12 @@ interface UpdateEventInput {
 export const updateEvent = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [jwtSecret],
   },
   async (request): Promise<void> => {
     const { eventId, updates, token } = request.data as UpdateEventInput;
 
-    if (!verifyToken(token)) {
+    if (!verifyToken(token, jwtSecret.value())) {
       throw new HttpsError('permission-denied', 'Invalid or expired token');
     }
 
@@ -431,12 +438,12 @@ interface DeleteEventInput {
 export const deleteEvent = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [jwtSecret],
   },
   async (request): Promise<void> => {
     const { eventId, token } = request.data as DeleteEventInput;
 
-    if (!verifyToken(token)) {
+    if (!verifyToken(token, jwtSecret.value())) {
       throw new HttpsError('permission-denied', 'Invalid or expired token');
     }
 
@@ -468,12 +475,12 @@ interface DeletePhotoInput {
 export const deletePhoto = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [jwtSecret],
   },
   async (request): Promise<void> => {
     const { photoId, token } = request.data as DeletePhotoInput;
 
-    if (!verifyToken(token)) {
+    if (!verifyToken(token, jwtSecret.value())) {
       throw new HttpsError('permission-denied', 'Invalid or expired token');
     }
 
@@ -530,13 +537,13 @@ interface DeletePhotosInput {
 export const deletePhotos = onCall(
   {
     region: 'europe-west1',
-    secrets: [adminPassword],
+    secrets: [jwtSecret],
     timeoutSeconds: 60,
   },
   async (request): Promise<{ deleted: number; failed: number }> => {
     const { photoIds, token } = request.data as DeletePhotosInput;
 
-    if (!verifyToken(token)) {
+    if (!verifyToken(token, jwtSecret.value())) {
       throw new HttpsError('permission-denied', 'Invalid or expired token');
     }
 
