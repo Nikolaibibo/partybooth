@@ -1,12 +1,19 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ErrorBoundary } from './ErrorBoundary';
+import { LoadingFallback } from './LoadingFallback';
+
+// Critical path - keep eager (booth is the main experience)
 import { BoothPage } from '../pages/BoothPage';
 import { EventSelector } from './EventSelector';
-import { GalleryPage } from '../gallery/GalleryPage';
-import { AdminLogin } from '../admin/AdminLogin';
-import { AdminLayout } from '../admin/AdminLayout';
-import { EventList } from '../admin/EventList';
-import { EventForm } from '../admin/EventForm';
-import { EventDetail } from '../admin/EventDetail';
+
+// Lazy load separate user journeys
+const GalleryPage = lazy(() => import('../gallery/GalleryPage').then(m => ({ default: m.GalleryPage })));
+const AdminLogin = lazy(() => import('../admin/AdminLogin').then(m => ({ default: m.AdminLogin })));
+const AdminLayout = lazy(() => import('../admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
+const EventList = lazy(() => import('../admin/EventList').then(m => ({ default: m.EventList })));
+const EventForm = lazy(() => import('../admin/EventForm').then(m => ({ default: m.EventForm })));
+const EventDetail = lazy(() => import('../admin/EventDetail').then(m => ({ default: m.EventDetail })));
 
 export function AppRouter() {
   return (
@@ -16,16 +23,48 @@ export function AppRouter() {
         <Route path="/" element={<EventSelector />} />
 
         {/* Booth mode - the main photo booth experience */}
-        <Route path="/booth" element={<BoothPage />} />
+        <Route path="/booth" element={
+          <ErrorBoundary>
+            <BoothPage />
+          </ErrorBoundary>
+        } />
 
         {/* Public gallery - anyone with event slug can view */}
-        <Route path="/gallery/:eventSlug" element={<GalleryPage />} />
+        <Route path="/gallery/:eventSlug" element={
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <GalleryPage />
+            </Suspense>
+          </ErrorBoundary>
+        } />
 
         {/* Admin routes */}
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route path="/admin/events" element={<AdminLayout><EventList /></AdminLayout>} />
-        <Route path="/admin/events/new" element={<AdminLayout><EventForm /></AdminLayout>} />
-        <Route path="/admin/events/:eventId" element={<AdminLayout><EventDetail /></AdminLayout>} />
+        <Route path="/admin" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <AdminLogin />
+          </Suspense>
+        } />
+        <Route path="/admin/events" element={
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <AdminLayout><EventList /></AdminLayout>
+            </Suspense>
+          </ErrorBoundary>
+        } />
+        <Route path="/admin/events/new" element={
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <AdminLayout><EventForm /></AdminLayout>
+            </Suspense>
+          </ErrorBoundary>
+        } />
+        <Route path="/admin/events/:eventId" element={
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <AdminLayout><EventDetail /></AdminLayout>
+            </Suspense>
+          </ErrorBoundary>
+        } />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

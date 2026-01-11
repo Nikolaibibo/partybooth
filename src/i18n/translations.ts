@@ -13,6 +13,12 @@ export const translations = {
     styleCyberpunk: 'Cyberpunk',
     styleWatercolor: 'Watercolor',
     stylePopArt: 'Pop Art',
+    styleSketch: 'Pencil Sketch',
+    styleSparkle: 'Sparkle',
+    styleDisco: 'Disco',
+    styleNeon: 'Neon',
+    stylePolaroid: 'Polaroid',
+    stylePixel: 'Pixel Art',
 
     // Camera
     getReady: 'Get ready!',
@@ -52,6 +58,7 @@ export const translations = {
     backToHome: 'Back to home',
     photos: 'photos',
     noPhotosYet: 'No photos yet',
+    loadMore: 'Load More',
 
     // Network
     noConnection: 'No Connection',
@@ -72,6 +79,12 @@ export const translations = {
     styleCyberpunk: 'Cyberpunk',
     styleWatercolor: 'Aquarell',
     stylePopArt: 'Pop Art',
+    styleSketch: 'Bleistift',
+    styleSparkle: 'Glitzer',
+    styleDisco: 'Disco',
+    styleNeon: 'Neon',
+    stylePolaroid: 'Polaroid',
+    stylePixel: 'Pixel Art',
 
     // Camera
     getReady: 'Mach dich bereit!',
@@ -111,6 +124,7 @@ export const translations = {
     backToHome: 'Zurück zur Startseite',
     photos: 'Fotos',
     noPhotosYet: 'Noch keine Fotos',
+    loadMore: 'Mehr laden',
 
     // Network
     noConnection: 'Keine Verbindung',

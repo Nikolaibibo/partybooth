@@ -77,19 +77,20 @@ export async function updateEvent(
   await callable({ eventId, updates, token });
 }
 
-// Delete an event
-export async function deleteEvent(eventId: string): Promise<void> {
+// Delete an event and all its photos
+export async function deleteEvent(eventId: string): Promise<{ deletedPhotos: number }> {
   const token = localStorage.getItem('adminToken');
   if (!token) {
     throw new Error('Not authenticated');
   }
 
-  const callable = httpsCallable<{ eventId: string; token: string }, void>(
-    functions,
-    'deleteEvent'
-  );
+  const callable = httpsCallable<
+    { eventId: string; token: string },
+    { deletedPhotos: number }
+  >(functions, 'deleteEvent');
 
-  await callable({ eventId, token });
+  const result = await callable({ eventId, token });
+  return result.data;
 }
 
 // Delete a single photo

@@ -10,4 +10,10 @@ export const styleNameKeys: Record<string, TranslationKey> = {
   cyberpunk: 'styleCyberpunk',
   watercolor: 'styleWatercolor',
   'pop-art': 'stylePopArt',
+  sketch: 'styleSketch',
+  sparkle: 'styleSparkle',
+  disco: 'styleDisco',
+  neon: 'styleNeon',
+  polaroid: 'stylePolaroid',
+  pixel: 'stylePixel',
 };

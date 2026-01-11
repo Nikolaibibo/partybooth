@@ -3,7 +3,11 @@ import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
 import { randomUUID, timingSafeEqual } from 'crypto';
 import sharp from 'sharp';
-import jwt from 'jsonwebtoken';
+
+import { generateToken, requireAdmin } from './utils/auth';
+import { requireString, requireArray, checkSlugUniqueness, requireImageBase64 } from './utils/validation';
+import { deletePhotoFiles } from './utils/storage';
+import { checkRateLimit, RATE_LIMITS } from './utils/rateLimit';
 
 admin.initializeApp();
 
@@ -27,17 +31,19 @@ const STYLE_PROMPTS: Record<string, string> = {
     "Apply delicate watercolor painting style to this portrait: soft flowing colors that blend at edges, visible paper texture throughout, gentle brushstroke effects, slightly muted pastel tones. Maintain the person's exact facial features, expression, and likeness while applying the watercolor artistic rendering.",
   'pop-art':
     "Apply bold Andy Warhol-style pop art treatment to this portrait: flatten colors into bright graphic blocks, dramatically increase contrast, add halftone dot patterns in midtones and shadows, use vibrant saturated colors. Maintain the person's exact face shape, features, and expression while applying the pop art color style.",
+  sketch:
+    "Transform this portrait into a detailed pencil sketch drawing: use graphite pencil shading techniques with crosshatching for shadows, clean defined lines for features, visible paper texture background, high contrast between light and dark areas. Maintain the person's exact facial features, expression, and likeness while applying the hand-drawn pencil sketch artistic style.",
+  sparkle:
+    "Add magical sparkle overlay effects around this portrait: scattered light particles and star-shaped lens flares floating around the subject, iridescent highlights on hair edges, fairy-dust particle overlay in the air. Do NOT alter the person's face or skin - only add sparkle effects around and near them.",
+  disco:
+    "Add 1970s disco lighting effects to this portrait: colorful light reflections as if from a disco ball casting pink/purple/blue colored light on the subject, light streaks, retro film grain texture. Add a dark background with scattered disco light spots. Do NOT alter the person's face - only add lighting and color effects.",
+  neon:
+    "Add neon lighting effects to this portrait: vivid cyan and magenta colored light sources casting dramatic colored shadows on the subject, electric blue rim lighting on edges. Add a dark urban background. Do NOT alter the person's face - only change the lighting colors and background.",
+  polaroid:
+    "Apply authentic Polaroid instant film style to this portrait: slightly faded colors with warm yellowish tint, soft vignette corners, subtle light leak effects, characteristic Polaroid color rendering with boosted warm tones. Maintain the person's exact facial features and expression while applying the vintage instant film aesthetic.",
+  pixel:
+    "Transform this portrait into pixel art style: reduce to chunky visible pixels like 8-bit retro video game graphics, limited color palette, blocky pixelated features while maintaining recognizable likeness. Apply retro gaming aesthetic with clean pixel edges.",
 };
-
-interface TransformRequest {
-  imageBase64: string;
-  styleId: string;
-  eventId: string;
-}
-
-interface TransformResponse {
-  imageUrl: string;
-}
 
 interface FluxSubmitResponse {
   id: string;
@@ -47,24 +53,15 @@ interface FluxSubmitResponse {
 interface FluxResultResponse {
   id: string;
   status: 'Pending' | 'Ready' | 'Error' | 'Request Moderated' | 'Content Moderated';
-  result?: {
-    sample: string;
-  };
+  result?: { sample: string };
 }
 
-async function submitToFlux(
-  apiKey: string,
-  prompt: string,
-  imageBase64: string
-): Promise<string> {
+async function submitToFlux(apiKey: string, prompt: string, imageBase64: string): Promise<string> {
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
   const response = await fetch('https://api.bfl.ai/v1/flux-kontext-pro', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-key': apiKey,
-    },
+    headers: { 'Content-Type': 'application/json', 'x-key': apiKey },
     body: JSON.stringify({
       prompt,
       input_image: base64Data,
@@ -77,108 +74,63 @@ async function submitToFlux(
   if (!response.ok) {
     const error = await response.text();
     console.error('FLUX API error:', response.status, error);
-    throw new HttpsError(
-      'internal',
-      `FLUX API error: ${response.status} - ${error}`
-    );
+    throw new HttpsError('internal', `FLUX API error: ${response.status} - ${error}`);
   }
 
   const data = (await response.json()) as FluxSubmitResponse;
-  console.log('FLUX submit response:', JSON.stringify(data));
   return data.polling_url;
 }
 
-async function pollForResult(
-  apiKey: string,
-  pollingUrl: string,
-  maxWaitMs = 60000
-): Promise<string> {
+async function pollForResult(apiKey: string, pollingUrl: string, maxWaitMs = 50000): Promise<string> {
   const startTime = Date.now();
-  const pollInterval = 1000;
 
   while (Date.now() - startTime < maxWaitMs) {
-    const response = await fetch(pollingUrl, {
-      headers: { 'x-key': apiKey },
-    });
+    const response = await fetch(pollingUrl, { headers: { 'x-key': apiKey } });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Poll error:', response.status, errorText);
       if (response.status === 429 || response.status >= 500) {
-        console.log('Retrying after error...');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
       }
       throw new HttpsError('internal', `Failed to check result: ${response.status}`);
     }
 
     const data = (await response.json()) as FluxResultResponse;
-    console.log('Poll status:', data.status, JSON.stringify(data));
 
     if (data.status === 'Ready' && data.result?.sample) {
       return data.result.sample;
     }
 
-    if (
-      data.status === 'Error' ||
-      data.status === 'Request Moderated' ||
-      data.status === 'Content Moderated'
-    ) {
+    if (data.status === 'Error' || data.status === 'Request Moderated' || data.status === 'Content Moderated') {
       throw new HttpsError('internal', `Processing failed: ${data.status}`);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   throw new HttpsError('deadline-exceeded', 'Image processing timed out');
 }
 
-async function downloadAndStoreImage(
-  signedUrl: string,
-  eventId: string
-): Promise<{ imageUrl: string; thumbnailUrl: string; storagePath: string }> {
+async function downloadAndStoreImage(signedUrl: string, eventId: string) {
   const imageResponse = await fetch(signedUrl);
-  if (!imageResponse.ok) {
-    throw new HttpsError('internal', 'Failed to download processed image');
-  }
+  if (!imageResponse.ok) throw new HttpsError('internal', 'Failed to download processed image');
 
   const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
   const timestamp = Date.now();
   const uuid = randomUUID();
   const bucket = admin.storage().bucket();
 
-  // Full-size image path
   const imagePath = `photos/${eventId}/${timestamp}_${uuid}.jpg`;
-  const imageFile = bucket.file(imagePath);
-
-  // Thumbnail path
   const thumbPath = `photos/${eventId}/thumbs/${timestamp}_${uuid}_thumb.jpg`;
-  const thumbFile = bucket.file(thumbPath);
 
-  // Generate thumbnail using Sharp
-  const thumbnailBuffer = await sharp(imageBuffer)
-    .resize(400, 400, { fit: 'cover' })
-    .jpeg({ quality: 80 })
-    .toBuffer();
+  const thumbnailBuffer = await sharp(imageBuffer).resize(400, 400, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
 
-  // Upload both in parallel
   await Promise.all([
-    imageFile.save(imageBuffer, {
-      metadata: {
-        contentType: 'image/jpeg',
-        cacheControl: 'public, max-age=31536000',
-      },
-    }),
-    thumbFile.save(thumbnailBuffer, {
-      metadata: {
-        contentType: 'image/jpeg',
-        cacheControl: 'public, max-age=31536000',
-      },
-    }),
+    bucket.file(imagePath).save(imageBuffer, { metadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=31536000' } }),
+    bucket.file(thumbPath).save(thumbnailBuffer, { metadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=31536000' } }),
   ]);
 
-  // Make both public
-  await Promise.all([imageFile.makePublic(), thumbFile.makePublic()]);
+  await Promise.all([bucket.file(imagePath).makePublic(), bucket.file(thumbPath).makePublic()]);
 
   return {
     imageUrl: `https://storage.googleapis.com/${bucket.name}/${imagePath}`,
@@ -187,183 +139,99 @@ async function downloadAndStoreImage(
   };
 }
 
+// ============================================================
+// Image Transform Function
+// ============================================================
+
 export const transformImage = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [bflApiKey],
-    timeoutSeconds: 120,
-    memory: '1GiB',
-    cors: true,
-  },
-  async (request): Promise<TransformResponse> => {
-    const { imageBase64, styleId, eventId } = request.data as TransformRequest;
+  { region: 'europe-west1', secrets: [bflApiKey], timeoutSeconds: 120, memory: '1GiB', cors: true },
+  async (request): Promise<{ imageUrl: string }> => {
+    const { imageBase64, styleId, eventId } = request.data as { imageBase64: string; styleId: string; eventId: string };
 
-    // Validate inputs
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
-      throw new HttpsError('invalid-argument', 'imageBase64 is required');
-    }
+    requireImageBase64(imageBase64, 'imageBase64');
+    requireString(styleId, 'styleId');
+    requireString(eventId, 'eventId');
 
-    if (!styleId || typeof styleId !== 'string') {
-      throw new HttpsError('invalid-argument', 'styleId is required');
-    }
+    // Rate limit
+    const clientIp = request.rawRequest?.ip || 'unknown';
+    await checkRateLimit(`transform:${eventId}:${clientIp}`, RATE_LIMITS.transformImage);
 
-    if (!eventId || typeof eventId !== 'string') {
-      throw new HttpsError('invalid-argument', 'eventId is required');
-    }
-
-    // Verify event exists and is active
     const eventDoc = await db.collection('events').doc(eventId).get();
-    if (!eventDoc.exists) {
-      throw new HttpsError('not-found', 'Event not found');
-    }
-    const eventData = eventDoc.data();
-    if (!eventData?.isActive) {
-      throw new HttpsError('failed-precondition', 'Event is not active');
-    }
+    if (!eventDoc.exists) throw new HttpsError('not-found', 'Event not found');
+    if (!eventDoc.data()?.isActive) throw new HttpsError('failed-precondition', 'Event is not active');
 
     const prompt = STYLE_PROMPTS[styleId];
-    if (!prompt) {
-      throw new HttpsError('invalid-argument', `Unknown style: ${styleId}`);
-    }
+    if (!prompt) throw new HttpsError('invalid-argument', `Unknown style: ${styleId}`);
 
     console.log(`Processing image for event ${eventId} with style: ${styleId}`);
 
     try {
-      // 1. Submit to FLUX API
       const pollingUrl = await submitToFlux(bflApiKey.value(), prompt, imageBase64);
-      console.log('FLUX polling URL:', pollingUrl);
-
-      // 2. Poll for result
       const signedUrl = await pollForResult(bflApiKey.value(), pollingUrl);
-      console.log('Got signed URL, downloading...');
+      const { imageUrl, thumbnailUrl, storagePath } = await downloadAndStoreImage(signedUrl, eventId);
 
-      // 3. Download, generate thumbnail, and store in Cloud Storage
-      const { imageUrl, thumbnailUrl, storagePath } = await downloadAndStoreImage(
-        signedUrl,
-        eventId
-      );
-      console.log('Stored at:', imageUrl);
-
-      // 3. Create photo document in Firestore
       await db.collection('photos').add({
-        eventId,
-        styleId,
-        imageUrl,
-        thumbnailUrl,
-        storagePath,
+        eventId, styleId, imageUrl, thumbnailUrl, storagePath,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       return { imageUrl };
     } catch (error) {
       console.error('Transform error:', error);
-
-      if (error instanceof HttpsError) {
-        throw error;
-      }
-
-      throw new HttpsError(
-        'internal',
-        'Failed to process image. Please try again.'
-      );
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError('internal', 'Failed to process image. Please try again.');
     }
   }
 );
 
 // ============================================================
-// Admin Functions
+// Admin Authentication
 // ============================================================
 
-const TOKEN_EXPIRY = '24h';
-
-function generateToken(secret: string): string {
-  return jwt.sign(
-    { admin: true, jti: randomUUID() },
-    secret,
-    { expiresIn: TOKEN_EXPIRY }
-  );
-}
-
-function verifyToken(token: string, secret: string): boolean {
-  try {
-    const payload = jwt.verify(token, secret) as jwt.JwtPayload;
-    return payload.admin === true;
-  } catch {
-    return false;
-  }
-}
-
 export const verifyAdmin = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [adminPassword, jwtSecret],
-  },
+  { region: 'europe-west1', secrets: [adminPassword, jwtSecret] },
   async (request): Promise<{ token: string }> => {
     const { password } = request.data as { password: string };
 
-    if (!password) {
-      throw new HttpsError('invalid-argument', 'Password is required');
-    }
+    const clientIp = request.rawRequest?.ip || 'unknown';
+    await checkRateLimit(`login:${clientIp}`, RATE_LIMITS.verifyAdmin);
 
-    // Compare with stored password using timing-safe comparison
+    requireString(password, 'password');
+
     const storedPassword = adminPassword.value();
     const inputBuffer = Buffer.from(password);
     const storedBuffer = Buffer.from(storedPassword);
 
-    if (inputBuffer.length !== storedBuffer.length ||
-        !timingSafeEqual(inputBuffer, storedBuffer)) {
+    if (inputBuffer.length !== storedBuffer.length || !timingSafeEqual(inputBuffer, storedBuffer)) {
       throw new HttpsError('permission-denied', 'Invalid password');
     }
 
-    // Generate signed JWT token
-    const token = generateToken(jwtSecret.value());
-    return { token };
+    return { token: generateToken(jwtSecret.value()) };
   }
 );
 
-interface CreateEventInput {
-  name: string;
-  slug: string;
-  date: Date | string;
-  isActive: boolean;
-  theme?: string;
-  token: string;
-}
+// ============================================================
+// Event Management
+// ============================================================
 
 export const createEvent = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [jwtSecret],
-  },
+  { region: 'europe-west1', secrets: [jwtSecret] },
   async (request): Promise<{ eventId: string }> => {
-    const { name, slug, date, isActive, theme, token } = request.data as CreateEventInput;
+    const { name, slug, date, isActive, theme, token } = request.data as {
+      name: string; slug: string; date: string; isActive: boolean; theme?: string; token: string;
+    };
 
-    // Verify admin token
-    if (!verifyToken(token, jwtSecret.value())) {
-      throw new HttpsError('permission-denied', 'Invalid or expired token');
-    }
+    requireAdmin(token, jwtSecret.value());
+    await checkRateLimit(`admin:${token.slice(-8)}`, RATE_LIMITS.adminOperations);
 
-    // Validate inputs
-    if (!name || !slug || !date) {
-      throw new HttpsError('invalid-argument', 'name, slug, and date are required');
-    }
+    requireString(name, 'name');
+    requireString(slug, 'slug');
+    if (!date) throw new HttpsError('invalid-argument', 'date is required');
 
-    // Check slug uniqueness
-    const existingSlug = await db
-      .collection('events')
-      .where('slug', '==', slug)
-      .get();
-    if (!existingSlug.empty) {
-      throw new HttpsError('already-exists', 'An event with this slug already exists');
-    }
+    await checkSlugUniqueness(db, slug);
 
-    // Create event
     const eventRef = await db.collection('events').add({
-      name,
-      slug,
-      date: new Date(date),
-      isActive: isActive ?? true,
-      theme: theme || 'default',
+      name, slug, date: new Date(date), isActive: isActive ?? true, theme: theme || 'default',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -371,54 +239,22 @@ export const createEvent = onCall(
   }
 );
 
-interface UpdateEventInput {
-  eventId: string;
-  updates: {
-    name?: string;
-    slug?: string;
-    date?: Date | string;
-    isActive?: boolean;
-    theme?: string;
-  };
-  token: string;
-}
-
 export const updateEvent = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [jwtSecret],
-  },
+  { region: 'europe-west1', secrets: [jwtSecret] },
   async (request): Promise<void> => {
-    const { eventId, updates, token } = request.data as UpdateEventInput;
+    const { eventId, updates, token } = request.data as {
+      eventId: string; updates: { name?: string; slug?: string; date?: string; isActive?: boolean; theme?: string }; token: string;
+    };
 
-    if (!verifyToken(token, jwtSecret.value())) {
-      throw new HttpsError('permission-denied', 'Invalid or expired token');
-    }
-
-    if (!eventId) {
-      throw new HttpsError('invalid-argument', 'eventId is required');
-    }
+    requireAdmin(token, jwtSecret.value());
+    await checkRateLimit(`admin:${token.slice(-8)}`, RATE_LIMITS.adminOperations);
+    requireString(eventId, 'eventId');
 
     const eventRef = db.collection('events').doc(eventId);
-    const eventDoc = await eventRef.get();
+    if (!(await eventRef.get()).exists) throw new HttpsError('not-found', 'Event not found');
 
-    if (!eventDoc.exists) {
-      throw new HttpsError('not-found', 'Event not found');
-    }
+    if (updates.slug) await checkSlugUniqueness(db, updates.slug, eventId);
 
-    // If slug is being updated, check uniqueness
-    if (updates.slug) {
-      const existingSlug = await db
-        .collection('events')
-        .where('slug', '==', updates.slug)
-        .get();
-      const otherEventWithSlug = existingSlug.docs.find((doc) => doc.id !== eventId);
-      if (otherEventWithSlug) {
-        throw new HttpsError('already-exists', 'An event with this slug already exists');
-      }
-    }
-
-    // Prepare update data
     const updateData: Record<string, unknown> = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.slug !== undefined) updateData.slug = updates.slug;
@@ -430,161 +266,92 @@ export const updateEvent = onCall(
   }
 );
 
-interface DeleteEventInput {
-  eventId: string;
-  token: string;
-}
-
 export const deleteEvent = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [jwtSecret],
-  },
-  async (request): Promise<void> => {
-    const { eventId, token } = request.data as DeleteEventInput;
+  { region: 'europe-west1', secrets: [jwtSecret], timeoutSeconds: 300 },
+  async (request): Promise<{ deletedPhotos: number }> => {
+    const { eventId, token } = request.data as { eventId: string; token: string };
 
-    if (!verifyToken(token, jwtSecret.value())) {
-      throw new HttpsError('permission-denied', 'Invalid or expired token');
-    }
-
-    if (!eventId) {
-      throw new HttpsError('invalid-argument', 'eventId is required');
-    }
+    requireAdmin(token, jwtSecret.value());
+    await checkRateLimit(`admin:${token.slice(-8)}`, RATE_LIMITS.adminOperations);
+    requireString(eventId, 'eventId');
 
     const eventRef = db.collection('events').doc(eventId);
-    const eventDoc = await eventRef.get();
+    if (!(await eventRef.get()).exists) throw new HttpsError('not-found', 'Event not found');
 
-    if (!eventDoc.exists) {
-      throw new HttpsError('not-found', 'Event not found');
+    // Delete all photos for this event
+    const photosSnapshot = await db.collection('photos').where('eventId', '==', eventId).get();
+    let deletedPhotos = 0;
+
+    // Process in batches of 10 for parallel deletion
+    const photoChunks: FirebaseFirestore.QueryDocumentSnapshot[][] = [];
+    for (let i = 0; i < photosSnapshot.docs.length; i += 10) {
+      photoChunks.push(photosSnapshot.docs.slice(i, i + 10));
     }
 
-    // Delete event (photos are kept for now - could add cleanup later)
+    for (const chunk of photoChunks) {
+      await Promise.all(
+        chunk.map(async (photoDoc) => {
+          try {
+            await deletePhotoFiles(photoDoc.data()?.storagePath);
+            await photoDoc.ref.delete();
+            deletedPhotos++;
+          } catch (err) {
+            console.warn(`Failed to delete photo ${photoDoc.id}:`, err);
+          }
+        })
+      );
+    }
+
+    // Delete the event
     await eventRef.delete();
+
+    return { deletedPhotos };
   }
 );
 
 // ============================================================
-// Photo Management Functions
+// Photo Management
 // ============================================================
-
-interface DeletePhotoInput {
-  photoId: string;
-  token: string;
-}
 
 export const deletePhoto = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [jwtSecret],
-  },
+  { region: 'europe-west1', secrets: [jwtSecret] },
   async (request): Promise<void> => {
-    const { photoId, token } = request.data as DeletePhotoInput;
+    const { photoId, token } = request.data as { photoId: string; token: string };
 
-    if (!verifyToken(token, jwtSecret.value())) {
-      throw new HttpsError('permission-denied', 'Invalid or expired token');
-    }
+    requireAdmin(token, jwtSecret.value());
+    await checkRateLimit(`admin:${token.slice(-8)}`, RATE_LIMITS.adminOperations);
+    requireString(photoId, 'photoId');
 
-    if (!photoId) {
-      throw new HttpsError('invalid-argument', 'photoId is required');
-    }
-
-    // Get photo document
     const photoRef = db.collection('photos').doc(photoId);
     const photoDoc = await photoRef.get();
+    if (!photoDoc.exists) throw new HttpsError('not-found', 'Photo not found');
 
-    if (!photoDoc.exists) {
-      throw new HttpsError('not-found', 'Photo not found');
-    }
-
-    const photoData = photoDoc.data();
-    const bucket = admin.storage().bucket();
-
-    // Delete files from storage
-    const deletePromises: Promise<unknown>[] = [];
-
-    if (photoData?.storagePath) {
-      // Delete main image
-      deletePromises.push(
-        bucket.file(photoData.storagePath).delete().catch((err) => {
-          console.warn('Failed to delete main image:', err.message);
-        })
-      );
-
-      // Delete thumbnail (derive path from storagePath)
-      const thumbPath = photoData.storagePath
-        .replace(`photos/`, `photos/`)
-        .replace(/\/([^/]+)$/, '/thumbs/$1')
-        .replace('.jpg', '_thumb.jpg');
-      deletePromises.push(
-        bucket.file(thumbPath).delete().catch((err) => {
-          console.warn('Failed to delete thumbnail:', err.message);
-        })
-      );
-    }
-
-    // Delete Firestore document and storage files
-    await Promise.all([...deletePromises, photoRef.delete()]);
-
-    console.log(`Deleted photo ${photoId}`);
+    await deletePhotoFiles(photoDoc.data()?.storagePath);
+    await photoRef.delete();
   }
 );
 
-interface DeletePhotosInput {
-  photoIds: string[];
-  token: string;
-}
-
 export const deletePhotos = onCall(
-  {
-    region: 'europe-west1',
-    secrets: [jwtSecret],
-    timeoutSeconds: 60,
-  },
+  { region: 'europe-west1', secrets: [jwtSecret], timeoutSeconds: 60 },
   async (request): Promise<{ deleted: number; failed: number }> => {
-    const { photoIds, token } = request.data as DeletePhotosInput;
+    const { photoIds, token } = request.data as { photoIds: string[]; token: string };
 
-    if (!verifyToken(token, jwtSecret.value())) {
-      throw new HttpsError('permission-denied', 'Invalid or expired token');
-    }
+    requireAdmin(token, jwtSecret.value());
+    await checkRateLimit(`admin:${token.slice(-8)}`, RATE_LIMITS.adminOperations);
+    requireArray(photoIds, 'photoIds');
 
-    if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
-      throw new HttpsError('invalid-argument', 'photoIds array is required');
-    }
+    if (photoIds.length > 100) throw new HttpsError('invalid-argument', 'Maximum 100 photos per request');
 
-    if (photoIds.length > 100) {
-      throw new HttpsError('invalid-argument', 'Maximum 100 photos per request');
-    }
-
-    const bucket = admin.storage().bucket();
-    let deleted = 0;
-    let failed = 0;
+    let deleted = 0, failed = 0;
 
     for (const photoId of photoIds) {
       try {
         const photoRef = db.collection('photos').doc(photoId);
         const photoDoc = await photoRef.get();
+        if (!photoDoc.exists) { failed++; continue; }
 
-        if (!photoDoc.exists) {
-          failed++;
-          continue;
-        }
-
-        const photoData = photoDoc.data();
-        const deletePromises: Promise<unknown>[] = [];
-
-        if (photoData?.storagePath) {
-          deletePromises.push(
-            bucket.file(photoData.storagePath).delete().catch(() => {})
-          );
-          const thumbPath = photoData.storagePath
-            .replace(/\/([^/]+)$/, '/thumbs/$1')
-            .replace('.jpg', '_thumb.jpg');
-          deletePromises.push(
-            bucket.file(thumbPath).delete().catch(() => {})
-          );
-        }
-
-        await Promise.all([...deletePromises, photoRef.delete()]);
+        await deletePhotoFiles(photoDoc.data()?.storagePath);
+        await photoRef.delete();
         deleted++;
       } catch (err) {
         console.error(`Failed to delete photo ${photoId}:`, err);
@@ -592,7 +359,6 @@ export const deletePhotos = onCall(
       }
     }
 
-    console.log(`Bulk delete: ${deleted} deleted, ${failed} failed`);
     return { deleted, failed };
   }
 );

@@ -42,8 +42,8 @@ const STYLES = [
   },
   // === NEW STYLES ===
   {
-    id: 'glamour',
-    prompt: 'Add glamorous photo effect: soft diffused glow, warm golden highlights, smooth skin enhancement, subtle lens flare. Magazine cover lighting.',
+    id: 'sketch',
+    prompt: 'Transform into a detailed pencil sketch drawing: graphite shading with crosshatching, clean defined lines, visible paper texture, high contrast. Keep the exact likeness.',
   },
   {
     id: 'sparkle',
@@ -62,8 +62,8 @@ const STYLES = [
     prompt: 'Apply instant camera effect: slightly washed out colors, warm color cast, soft focus edges, characteristic Polaroid color tones. Keep the person unchanged.',
   },
   {
-    id: 'vhs',
-    prompt: 'Apply VHS tape effect: slight horizontal scan lines, minor color bleeding, retro 90s video quality, subtle tracking distortion. Keep the person unchanged.',
+    id: 'pixel',
+    prompt: 'Transform into pixel art: chunky visible pixels like 8-bit retro video game, limited color palette, blocky features. Keep recognizable likeness.',
   },
 ];
 

@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import JSZip from 'jszip';
 import { getEventById } from '../services/events';
 import { updateEvent, deleteEvent, deletePhoto, deletePhotos } from '../services/admin';
 import { getGalleryPhotos } from '../services/gallery';
@@ -34,8 +33,8 @@ export function EventDetail() {
         }
         setEvent(eventData);
 
-        const photosData = await getGalleryPhotos(eventId);
-        setPhotos(photosData);
+        const photosResult = await getGalleryPhotos(eventId);
+        setPhotos(photosResult.photos);
       } catch (err) {
         console.error('Error loading event:', err);
       } finally {
@@ -64,7 +63,12 @@ export function EventDetail() {
 
   const handleDelete = async () => {
     if (!eventId) return;
-    if (!confirm('Are you sure you want to delete this event? This cannot be undone.')) {
+    const photoCount = photos.length;
+    const message = photoCount > 0
+      ? `Delete this event and all ${photoCount} photos? This cannot be undone.`
+      : 'Delete this event? This cannot be undone.';
+
+    if (!confirm(message)) {
       return;
     }
 
@@ -139,6 +143,7 @@ export function EventDetail() {
     setError(null);
 
     try {
+      const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const folder = zip.folder(event.slug || 'photos');
 

@@ -105,11 +105,20 @@ style-selection → countdown → capturing → processing → result → (reset
 
 | Function | Purpose |
 |----------|---------|
-| `transformImage` | Process photo with FLUX API, store with thumbnail |
-| `verifyAdmin` | Validate admin password, return session token |
+| `transformImage` | Process photo with FLUX API, store with thumbnail (rate limited) |
+| `verifyAdmin` | Validate admin password, return JWT token (rate limited) |
 | `createEvent` | Create new event (requires admin token) |
 | `updateEvent` | Update event properties (requires admin token) |
-| `deleteEvent` | Delete event (requires admin token) |
+| `deleteEvent` | Delete event and cascade delete all photos + storage files |
+| `deletePhoto` | Delete single photo and storage files |
+| `deletePhotos` | Bulk delete up to 100 photos |
+
+### Rate Limiting
+
+Distributed rate limiting via Firestore (`rateLimits` collection):
+- `verifyAdmin`: 5 requests / 5 minutes per IP
+- `transformImage`: 30 requests / minute per event+IP
+- Admin operations: 30 requests / minute per token
 
 ### Storage Structure
 ```
@@ -126,14 +135,16 @@ Language is determined by URL parameter (`?lang=de` or `?lang=en`, defaults to E
 ## Firebase Configuration
 
 - **Project:** partybooth-f8991547
+- **Hosting URL:** https://partybooth.web.app
 - **Region:** europe-west1 (functions)
-- **Firestore:** Events and photo metadata
+- **Firestore:** Events, photos, and rate limits
 - **Storage:** Public read, functions-only write
 
 ### Secrets
 ```bash
 firebase functions:secrets:set BFL_API_KEY        # FLUX API key
 firebase functions:secrets:set ADMIN_PASSWORD     # Admin login password
+firebase functions:secrets:set JWT_SECRET         # JWT signing secret
 ```
 
 ### Environment Variables (.env.local)
@@ -150,14 +161,19 @@ VITE_USE_EMULATOR=true  # Optional: connect to local emulators
 
 | Path | Purpose |
 |------|---------|
-| `src/components/Router.tsx` | App routing configuration |
+| `src/components/Router.tsx` | App routing with lazy loading |
+| `src/components/ErrorBoundary.tsx` | React error boundary |
 | `src/pages/BoothPage.tsx` | Main photo booth logic |
-| `src/gallery/GalleryPage.tsx` | Public gallery view |
+| `src/gallery/GalleryPage.tsx` | Public gallery with pagination |
 | `src/admin/*.tsx` | Admin interface components |
 | `src/services/events.ts` | Event Firestore queries |
-| `src/services/gallery.ts` | Photo Firestore queries |
+| `src/services/gallery.ts` | Photo queries with cursor pagination |
 | `src/services/admin.ts` | Admin API calls |
-| `functions/src/index.ts` | All cloud functions |
+| `functions/src/index.ts` | Cloud functions |
+| `functions/src/utils/auth.ts` | JWT token generation/validation |
+| `functions/src/utils/rateLimit.ts` | Distributed rate limiting |
+| `functions/src/utils/validation.ts` | Input validation helpers |
+| `functions/src/utils/storage.ts` | Storage file deletion |
 | `firestore.rules` | Firestore security rules |
 | `firestore.indexes.json` | Composite indexes |
 
@@ -167,8 +183,25 @@ Styles are defined in two places (keep in sync):
 - `src/data/styles.json` - Client-side metadata (id, gradient, color)
 - `functions/src/index.ts` - Server-side prompts (security: not exposed to client)
 
+**Current styles:** comic, pop-art, vintage, cyberpunk, sketch, sparkle, disco, neon, polaroid, pixel
+
 Adding a new style requires:
 1. Add entry to `styles.json`
 2. Add prompt to `STYLE_PROMPTS` in cloud function
 3. Add translation keys to `src/i18n/translations.ts` (both `en` and `de`)
-4. Update `styleNameKeys` mapping in `StyleGallery.tsx` and `ProcessingView.tsx`
+4. Add mapping to `src/data/styleNames.ts`
+5. Generate thumbnail: `BFL_API_KEY=xxx node scripts/generate-thumbnails.js scripts/source.jpg <style-id>`
+
+## Code Architecture
+
+### Code Splitting
+Admin and gallery routes are lazy-loaded via `React.lazy()` to reduce initial bundle size. Critical booth flow is eagerly loaded.
+
+### Error Boundaries
+`ErrorBoundary` component wraps route groups to catch render errors with retry capability.
+
+### Security
+- JWT tokens for admin authentication (24h expiry)
+- Timing-safe password comparison
+- Image validation (format + 9MB size limit)
+- Security headers (X-Frame-Options, CSP basics via firebase.json)

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { getEventBySlug } from '../services/events';
-import { getGalleryPhotos } from '../services/gallery';
+import { getGalleryPhotos, getPhotoCount } from '../services/gallery';
 import { PhotoGrid } from './PhotoGrid';
 import { PhotoModal } from './PhotoModal';
 import { ThemeProvider } from '../contexts/ThemeContext';
@@ -12,9 +13,13 @@ export function GalleryPage() {
   const { eventSlug } = useParams<{ eventSlug: string }>();
   const [event, setEvent] = useState<Event | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -32,7 +37,6 @@ export function GalleryPage() {
       try {
         const eventData = await getEventBySlug(eventSlug);
 
-        // Check if still mounted before updating state
         if (!isMounted) return;
 
         if (!eventData) {
@@ -43,12 +47,17 @@ export function GalleryPage() {
 
         setEvent(eventData);
 
-        const photosData = await getGalleryPhotos(eventData.id);
+        const [photosResult, count] = await Promise.all([
+          getGalleryPhotos(eventData.id),
+          getPhotoCount(eventData.id),
+        ]);
 
-        // Check again before final state update
         if (!isMounted) return;
 
-        setPhotos(photosData);
+        setPhotos(photosResult.photos);
+        setCursor(photosResult.lastDoc);
+        setHasMore(photosResult.hasMore);
+        setTotalCount(count);
       } catch (err) {
         console.error('Error loading gallery:', err);
         if (isMounted) {
@@ -67,6 +76,22 @@ export function GalleryPage() {
       isMounted = false;
     };
   }, [eventSlug]);
+
+  const loadMore = useCallback(async () => {
+    if (!event || !cursor || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const result = await getGalleryPhotos(event.id, cursor);
+      setPhotos((prev) => [...prev, ...result.photos]);
+      setCursor(result.lastDoc);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      console.error('Error loading more photos:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [event, cursor, loadingMore]);
 
   if (loading) {
     return (
@@ -94,7 +119,7 @@ export function GalleryPage() {
 
   return (
     <ThemeProvider themeId={event.theme}>
-      <div className="min-h-screen bg-theme-surface-dark">
+      <div className="h-screen overflow-y-auto bg-theme-surface-dark">
         {/* Header */}
         <header className="bg-theme-surface-medium border-b border-white/10 px-4 md:px-8 py-6">
           <div className="max-w-7xl mx-auto">
@@ -102,7 +127,7 @@ export function GalleryPage() {
               {event.name}
             </h1>
             <p className="text-theme-text-muted font-theme-body mt-2">
-              {event.date.toLocaleDateString()} • {photos.length} {t('photos')}
+              {event.date.toLocaleDateString()} • {totalCount} {t('photos')}
             </p>
           </div>
         </header>
@@ -114,7 +139,34 @@ export function GalleryPage() {
               {t('noPhotosYet')}
             </div>
           ) : (
-            <PhotoGrid photos={photos} onPhotoClick={setSelectedPhoto} />
+            <>
+              <PhotoGrid photos={photos} onPhotoClick={setSelectedPhoto} />
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="px-8 py-3 bg-theme-primary hover:opacity-90 disabled:opacity-50
+                               text-white font-semibold rounded-xl transition-opacity
+                               min-h-[48px] touch-manipulation"
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        {t('loadingGallery')}
+                      </span>
+                    ) : (
+                      `${t('loadMore')} (${photos.length}/${totalCount})`
+                    )}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </main>
 
