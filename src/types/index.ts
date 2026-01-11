@@ -47,6 +47,7 @@ export interface Event {
   createdAt: Date;
   isActive: boolean;
   theme?: ThemeId;
+  maxPhotos?: number; // Optional limit on photos per event (null = unlimited)
 }
 
 export interface Photo {

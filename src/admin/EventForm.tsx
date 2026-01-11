@@ -16,6 +16,7 @@ export function EventForm() {
   const [slug, setSlug] = useState('');
   const [date, setDate] = useState('');
   const [theme, setTheme] = useState<ThemeId>('default');
+  const [maxPhotos, setMaxPhotos] = useState<string>('100');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,12 +32,14 @@ export function EventForm() {
     setLoading(true);
 
     try {
+      const parsedMax = parseInt(maxPhotos, 10);
       const eventId = await createEvent({
         name,
         slug,
         date: new Date(date),
         isActive: true,
         theme,
+        maxPhotos: !isNaN(parsedMax) && parsedMax > 0 ? parsedMax : undefined,
       });
       navigate(`/admin/events/${eventId}`);
     } catch (err) {
@@ -104,6 +107,25 @@ export function EventForm() {
                        focus:ring-purple-500 font-inter"
             required
           />
+        </div>
+
+        <div>
+          <label className="block text-gray-400 font-inter mb-2">
+            Photo Limit
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={maxPhotos}
+            onChange={(e) => setMaxPhotos(e.target.value)}
+            placeholder="100"
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700
+                       text-white rounded-xl focus:outline-none focus:ring-2
+                       focus:ring-purple-500 font-inter"
+          />
+          <p className="text-gray-500 text-sm mt-1 font-inter">
+            Maximum photos allowed for this event (leave empty for unlimited)
+          </p>
         </div>
 
         <div>

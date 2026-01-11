@@ -156,7 +156,21 @@ export const transformImage = onCall(
 
     const eventDoc = await db.collection('events').doc(eventId).get();
     if (!eventDoc.exists) throw new HttpsError('not-found', 'Event not found');
-    if (!eventDoc.data()?.isActive) throw new HttpsError('failed-precondition', 'Event is not active');
+    const eventData = eventDoc.data();
+    if (!eventData?.isActive) throw new HttpsError('failed-precondition', 'Event is not active');
+
+    // Check photo limit
+    const maxPhotos = eventData.maxPhotos as number | undefined;
+    if (maxPhotos !== undefined && maxPhotos > 0) {
+      const photosSnapshot = await db.collection('photos')
+        .where('eventId', '==', eventId)
+        .count()
+        .get();
+      const currentCount = photosSnapshot.data().count;
+      if (currentCount >= maxPhotos) {
+        throw new HttpsError('resource-exhausted', `Photo limit reached (${maxPhotos})`);
+      }
+    }
 
     const prompt = STYLE_PROMPTS[styleId];
     if (!prompt) throw new HttpsError('invalid-argument', `Unknown style: ${styleId}`);
@@ -215,8 +229,8 @@ export const verifyAdmin = onCall(
 export const createEvent = onCall(
   { region: 'europe-west1', secrets: [jwtSecret] },
   async (request): Promise<{ eventId: string }> => {
-    const { name, slug, date, isActive, theme, token } = request.data as {
-      name: string; slug: string; date: string; isActive: boolean; theme?: string; token: string;
+    const { name, slug, date, isActive, theme, maxPhotos, token } = request.data as {
+      name: string; slug: string; date: string; isActive: boolean; theme?: string; maxPhotos?: number; token: string;
     };
 
     requireAdmin(token, jwtSecret.value());
@@ -228,10 +242,15 @@ export const createEvent = onCall(
 
     await checkSlugUniqueness(db, slug);
 
-    const eventRef = await db.collection('events').add({
+    const eventData: Record<string, unknown> = {
       name, slug, date: new Date(date), isActive: isActive ?? true, theme: theme || 'default',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (maxPhotos !== undefined && maxPhotos > 0) {
+      eventData.maxPhotos = maxPhotos;
+    }
+
+    const eventRef = await db.collection('events').add(eventData);
 
     return { eventId: eventRef.id };
   }
@@ -241,7 +260,7 @@ export const updateEvent = onCall(
   { region: 'europe-west1', secrets: [jwtSecret] },
   async (request): Promise<void> => {
     const { eventId, updates, token } = request.data as {
-      eventId: string; updates: { name?: string; slug?: string; date?: string; isActive?: boolean; theme?: string }; token: string;
+      eventId: string; updates: { name?: string; slug?: string; date?: string; isActive?: boolean; theme?: string; maxPhotos?: number | null }; token: string;
     };
 
     requireAdmin(token, jwtSecret.value());
@@ -259,6 +278,14 @@ export const updateEvent = onCall(
     if (updates.date !== undefined) updateData.date = new Date(updates.date);
     if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
     if (updates.theme !== undefined) updateData.theme = updates.theme;
+    if (updates.maxPhotos !== undefined) {
+      // null removes the limit, positive number sets it
+      if (updates.maxPhotos === null) {
+        updateData.maxPhotos = admin.firestore.FieldValue.delete();
+      } else if (updates.maxPhotos > 0) {
+        updateData.maxPhotos = updates.maxPhotos;
+      }
+    }
 
     await eventRef.update(updateData);
   }

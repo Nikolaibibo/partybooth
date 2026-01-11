@@ -20,6 +20,8 @@ export function EventDetail() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [editingLimit, setEditingLimit] = useState(false);
+  const [newLimit, setNewLimit] = useState('');
 
   useEffect(() => {
     async function loadEvent() {
@@ -133,6 +135,30 @@ export function EventDetail() {
 
   const deselectAll = () => {
     setSelectedIds(new Set());
+  };
+
+  const handleUpdateLimit = async () => {
+    if (!event || !eventId) return;
+    setUpdating(true);
+    setError(null);
+
+    try {
+      const parsed = newLimit === '' ? null : parseInt(newLimit, 10);
+      const maxPhotos = parsed === null || isNaN(parsed) || parsed <= 0 ? null : parsed;
+      await updateEvent(eventId, { maxPhotos });
+      setEvent({ ...event, maxPhotos: maxPhotos ?? undefined });
+      setEditingLimit(false);
+    } catch (err) {
+      console.error('Error updating photo limit:', err);
+      setError('Failed to update photo limit.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const startEditingLimit = () => {
+    setNewLimit(event?.maxPhotos?.toString() || '');
+    setEditingLimit(true);
   };
 
   const downloadAllPhotos = async () => {
@@ -291,6 +317,63 @@ export function EventDetail() {
               Copy
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Photo Limit */}
+      <div className="bg-gray-800 rounded-xl p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white font-poppins mb-1">
+              Photo Limit
+            </h3>
+            <p className="text-gray-400 text-sm font-inter">
+              {event.maxPhotos
+                ? `${photos.length} / ${event.maxPhotos} photos used`
+                : `${photos.length} photos (unlimited)`}
+            </p>
+            {event.maxPhotos && photos.length >= event.maxPhotos && (
+              <p className="text-yellow-400 text-sm font-inter mt-1">
+                Limit reached - no more photos can be taken
+              </p>
+            )}
+          </div>
+          {editingLimit ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                value={newLimit}
+                onChange={(e) => setNewLimit(e.target.value)}
+                placeholder="Unlimited"
+                className="w-24 px-3 py-2 bg-gray-900 border border-gray-700
+                           text-white rounded-lg text-sm font-inter"
+              />
+              <button
+                onClick={handleUpdateLimit}
+                disabled={updating}
+                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50
+                           text-white rounded-lg transition-colors text-sm"
+              >
+                {updating ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditingLimit(false)}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600
+                           text-white rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={startEditingLimit}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600
+                         text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              {event.maxPhotos ? `Edit (${event.maxPhotos})` : 'Set Limit'}
+            </button>
+          )}
         </div>
       </div>
 

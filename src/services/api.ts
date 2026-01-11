@@ -66,6 +66,9 @@ export async function transformImage(
         if (err.code === 'functions/invalid-argument') {
           throw new Error('Invalid request. Please try again.');
         }
+        if (err.code === 'functions/resource-exhausted') {
+          throw new Error('Photo limit reached for this event.');
+        }
         throw new Error(err.message || 'Something went wrong. Please try again.');
       }
 

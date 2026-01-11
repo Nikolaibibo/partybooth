@@ -43,6 +43,7 @@ export function eventFromFirestore(id: string, data: Record<string, unknown>): E
     createdAt: convertTimestamp(data.createdAt as Timestamp),
     isActive: data.isActive as boolean,
     theme: (data.theme as ThemeId) || 'default',
+    maxPhotos: data.maxPhotos as number | undefined,
   };
 }
 

@@ -42,6 +42,7 @@ interface CreateEventInput {
   date: Date;
   isActive: boolean;
   theme?: ThemeId;
+  maxPhotos?: number;
 }
 
 export async function createEvent(input: CreateEventInput): Promise<string> {
@@ -59,10 +60,10 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
   return result.data.eventId;
 }
 
-// Update an event
+// Update an event (maxPhotos: null removes the limit)
 export async function updateEvent(
   eventId: string,
-  updates: Partial<Pick<Event, 'name' | 'slug' | 'date' | 'isActive' | 'theme'>>
+  updates: Partial<Pick<Event, 'name' | 'slug' | 'date' | 'isActive' | 'theme'>> & { maxPhotos?: number | null }
 ): Promise<void> {
   const token = localStorage.getItem('adminToken');
   if (!token) {
